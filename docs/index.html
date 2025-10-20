@@ -1,8 +1,14 @@
 <!doctype html>
 <html>
-  <head><meta charset="utf-8"><title>OK</title></head>
-  <body>
-    <h1>✅ GitHub Pages is serving /docs/index.html</h1>
-    <p>If you see this, the Pages folder & filename are correct.</p>
-  </body>
+<head>
+  <meta charset="utf-8"><title>Plotly Test</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+  <h1>Plotly sanity check</h1>
+  <div id="plot" style="height:300px"></div>
+  <script>
+    Plotly.newPlot('plot', [{x:[1,2,3], y:[2,1,4]}], {title:'Hello Plotly'});
+  </script>
+</body>
 </html>
