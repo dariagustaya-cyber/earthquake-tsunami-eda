@@ -165,14 +165,14 @@ if st.button("Train model", type="primary", key="train_button"):
     run_id = st.session_state.run_id
 
     pipe.fit(X_train, y_train)
-    y_proba = pipe.predict_proba(X_test)[:,1]
-    y_pred  = (y_proba >= 0.5).astype(int)
+    y_proba = pipe.predict_proba(X_test)[:, 1]
+    y_pred = (y_proba >= 0.5).astype(int)
 
     # Metrics
-    acc  = accuracy_score(y_test, y_pred)
-    rec  = recall_score(y_test, y_pred)
+    acc = accuracy_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred, zero_division=0)
-    f1   = f1_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
     rocA = roc_auc_score(y_test, y_proba)
 
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -184,44 +184,53 @@ if st.button("Train model", type="primary", key="train_button"):
 
     # Confusion Matrix (base @ th=0.50)
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
-    cm = np.array([[tn, fp],[fn, tp]])
-    fig_cm = px.imshow(cm, text_auto=True, x=["Pred 0","Pred 1"], y=["True 0","True 1"],
-                       color_continuous_scale="Blues", title="Confusion Matrix (th = 0.50)")
+    cm = np.array([[tn, fp], [fn, tp]])
+    fig_cm = px.imshow(
+        cm,
+        text_auto=True,
+        x=["Pred 0", "Pred 1"],
+        y=["True 0", "True 1"],
+        color_continuous_scale="Blues",
+        title="Confusion Matrix (th = 0.50)"
+    )
     st.plotly_chart(fig_cm, use_container_width=True, key=f"cm_base_{run_id}")
 
     # ROC
     fpr, tpr, thr = roc_curve(y_test, y_proba)
     fig_roc = go.Figure()
     fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", name=f"ROC (AUC={rocA:.3f})"))
-    fig_roc.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines", name="Chance", line=dict(dash="dash")))
+    fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Chance", line=dict(dash="dash")))
     fig_roc.update_layout(title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR (Recall)")
     st.plotly_chart(fig_roc, use_container_width=True, key=f"roc_curve_{run_id}")
 
-   # Precision–Recall
-prec_curve, rec_curve, thr2 = precision_recall_curve(y_test, y_proba)
-fig_pr = go.Figure()
-fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
-fig_pr.update_layout(
-    title="Precision–Recall Curve (class = 1)",
-    xaxis_title="Recall",
-    yaxis_title="Precision"
-)
-st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
+    # Precision–Recall
+    prec_curve, rec_curve, thr2 = precision_recall_curve(y_test, y_proba)
+    fig_pr = go.Figure()
+    fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
+    fig_pr.update_layout(
+        title="Precision–Recall Curve (class = 1)",
+        xaxis_title="Recall",
+        yaxis_title="Precision"
+    )
+    st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
 
-# ---------------------------
-# Threshold tuner (safety-first)
-# ---------------------------
+    # ---------------------------
+    # Threshold tuner (safety-first)
+    # ---------------------------
     st.subheader("Threshold tuner (safety-first)")
     t = st.slider("Decision threshold", 0.05, 0.95, 0.50, 0.01, key=f"threshold_slider_{run_id}")
 
     y_pred_t = (y_proba >= t).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred_t).ravel()
-    acc_t  = accuracy_score(y_test, y_pred_t)
-    rec_t  = recall_score(y_test, y_pred_t)
+    acc_t = accuracy_score(y_test, y_pred_t)
+    rec_t = recall_score(y_test, y_pred_t)
     prec_t = precision_score(y_test, y_pred_t, zero_division=0)
-    f1_t   = f1_score(y_test, y_pred_t)
+    f1_t = f1_score(y_test, y_pred_t)
 
-    st.write(f"**Threshold = {t:.2f}** → Accuracy: {acc_t:.3f} | Recall: {rec_t:.3f} | Precision: {prec_t:.3f} | F1: {f1_t:.3f}")
+    st.write(
+        f"**Threshold = {t:.2f}** → Accuracy: {acc_t:.3f} | Recall: {rec_t:.3f} | "
+        f"Precision: {prec_t:.3f} | F1: {f1_t:.3f}"
+    )
 
     cm_t = np.array([[tn, fp], [fn, tp]])
     fig_cm_t = px.imshow(
@@ -254,5 +263,8 @@ st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
         x_row = pd.DataFrame([inputs])
         p = pipe.predict_proba(x_row)[0, 1]
         yhat = int(p >= t)
-        st.success(f"Predicted probability (class=1 tsunami) = {p:.3f} → Predicted class @ th={t:.2f}: **{yhat}**")
+        st.success(
+f"Predicted probability (class=1 tsunami) = {p:.3f} "
+            f"→ Predicted class @ th={t:.2f}: **{yhat}**"
+        )
         st.caption("Tip: lower the threshold for higher recall (safer), raise it for fewer false alarms.")
