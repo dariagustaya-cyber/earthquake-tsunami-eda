@@ -185,9 +185,6 @@ mlp = MLPClassifier(
 pipe = Pipeline([("pre", pre), ("clf", mlp)])
 
 # Choose rule for best threshold (no UI clutter; default = F1)
-criterion_label = st.selectbox("Operating point (auto threshold by)", 
-                               ["Best F1", "Best Accuracy", "Best Youden (TPR−FPR)"], index=0)
-
 if st.button("Train MLP", type="primary", key="train_button"):
     st.session_state.run_id += 1
     run_id = st.session_state.run_id
@@ -195,8 +192,8 @@ if st.button("Train MLP", type="primary", key="train_button"):
     pipe.fit(X_train, y_train)
     y_proba = pipe.predict_proba(X_test)[:, 1]
 
-    mode_map = {"Best F1":"f1", "Best Accuracy":"accuracy", "Best Youden (TPR−FPR)":"youden"}
-    t_star = best_threshold(y_test, y_proba, mode=mode_map[criterion_label])
+    # Automatically find best threshold for F1
+    t_star = best_threshold(y_test, y_proba, mode="f1")
     y_pred = (y_proba >= t_star).astype(int)
 
     # Metrics @ t*
