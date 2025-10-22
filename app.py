@@ -103,7 +103,7 @@ with col3:
         text="Count",
         title="Class Balance"
     ).update_traces(textposition="outside")
-    st.plotly_chart(fig_bal, use_container_width=True, key="class_balance")
+    st.plotly_chart(fig_bal, use_container_width=True, key=f"class_balance_{st.session_state.get('run_id', 0)}")
     st.caption("Note: nst–year correlation reflects changing instrumentation/reporting over time → metadata, not tsunami physics.")
 
 # Map (if lat/lon present)
