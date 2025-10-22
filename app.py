@@ -92,22 +92,18 @@ st.subheader("Describe (numeric)")
 st.dataframe(df.select_dtypes(include=[np.number]).describe().T, use_container_width=True)
 
 # Distributions for a few key vars (if present)
-dist_cols = [c for c in ["magnitude","depth","sig"] if c in df.columns]
-if dist_cols:
-    st.subheader("Distributions by class")
-    dcols = st.columns(len(dist_cols))
-    for i, c in enumerate(dist_cols):
-        fig = px.histogram(df, x=c, color=target, nbins=35, marginal="box", opacity=0.7, title=f"{c} distribution")
-        dcols[i].plotly_chart(fig, use_container_width=True, key=f"dist_{c}")
-
-# Correlations (numeric only)
-num_for_corr = df.select_dtypes(include=[np.number]).drop(columns=[], errors="ignore")
-if num_for_corr.shape[1] >= 2:
-    st.
-subheader("Correlation heatmap (numeric)")
-    corr = num_for_corr.corr(method="pearson")
-    fig_corr = px.imshow(corr, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, title="Pearson correlation")
-    st.plotly_chart(fig_corr, use_container_width=True, key="corr_heatmap")
+with col3:
+    st.subheader("Class balance")
+    bal = df[target].value_counts().rename(index={0: "Non-tsunami", 1: "Tsunami"}).reset_index()
+    bal.columns = ["Class", "Count"]
+    fig_bal = px.bar(
+        bal,
+        x="Class",
+        y="Count",
+        text="Count",
+        title="Class Balance"
+    ).update_traces(textposition="outside")
+    st.plotly_chart(fig_bal, use_container_width=True, key="class_balance")
     st.caption("Note: nst–year correlation reflects changing instrumentation/reporting over time → metadata, not tsunami physics.")
 
 # Map (if lat/lon present)
