@@ -56,7 +56,7 @@ with st.expander("⚙️ Modeling Setup", expanded=True):
 
     # Validate target is binary
     if df[target].nunique() != 2:
-        st.error(f"Target `{target}` must be binary (two unique values). Found: {df[target].unique()}")
+        st.error(f"Target {target} must be binary (two unique values). Found: {df[target].unique()}")
         st.stop()
 
     # Split numeric / categorical
@@ -83,8 +83,10 @@ with col3:
     st.subheader("Class balance")
     bal = df[target].value_counts().rename(index={0: "Non-tsunami", 1: "Tsunami"}).reset_index()
     bal.columns = ["Class","Count"]
-    st.plotly_chart(px.bar(bal, x="Class", y="Count", text="Count", title="Class Balance").update_traces(textposition="outside"),
-                    use_container_width=True, key="class_balance")
+    st.plotly_chart(
+        px.bar(bal, x="Class", y="Count", text="Count", title="Class Balance").update_traces(textposition="outside"),
+        use_container_width=True, key="class_balance"
+    )
 
 st.subheader("Describe (numeric)")
 st.dataframe(df.select_dtypes(include=[np.number]).describe().T, use_container_width=True)
@@ -101,11 +103,12 @@ if dist_cols:
 # Correlations (numeric only)
 num_for_corr = df.select_dtypes(include=[np.number]).drop(columns=[], errors="ignore")
 if num_for_corr.shape[1] >= 2:
-    st.subheader("Correlation heatmap (numeric)")
+    st.
+subheader("Correlation heatmap (numeric)")
     corr = num_for_corr.corr(method="pearson")
     fig_corr = px.imshow(corr, color_continuous_scale="RdBu_r", zmin=-1, zmax=1, title="Pearson correlation")
     st.plotly_chart(fig_corr, use_container_width=True, key="corr_heatmap")
-    st.caption("Note: `nst–year` correlation reflects changing instrumentation/reporting over time → metadata, not tsunami physics.")
+    st.caption("Note: nst–year correlation reflects changing instrumentation/reporting over time → metadata, not tsunami physics.")
 
 # Map (if lat/lon present)
 if {"latitude","longitude"}.issubset(df.columns):
@@ -145,17 +148,26 @@ if algo == "Logistic Regression":
 elif algo == "Random Forest":
     clf = RandomForestClassifier(n_estimators=300, max_depth=None, random_state=random_state, n_jobs=-1)
 else:
-    clf = MLPClassifier(hidden_layer_sizes=(16,8),
-                        activation="relu",
-                        solver="adam",
-                        max_iter=1000,
-                        early_stopping=True,
-                        n_iter_no_change=20,
-                        random_state=random_state)
+    clf = MLPClassifier(
+        hidden_layer_sizes=(16,8),
+        activation="relu",
+        solver="adam",
+        max_iter=1000,
+        early_stopping=True,
+        n_iter_no_change=20,
+        random_state=random_state
+    )
 
 pipe = Pipeline([("pre", pre), ("clf", clf)])
 
-if st.button("Train model", type="primary"):
+# Keep a per-run counter to avoid duplicate element IDs
+if "run_id" not in st.session_state:
+    st.session_state.run_id = 0
+
+if st.button("Train model", type="primary", key="train_button"):
+    st.session_state.run_id += 1
+    run_id = st.session_state.run_id
+
     pipe.fit(X_train, y_train)
     y_proba = pipe.predict_proba(X_test)[:,1]
     y_pred  = (y_proba >= 0.5).astype(int)
@@ -179,7 +191,7 @@ if st.button("Train model", type="primary"):
     cm = np.array([[tn, fp],[fn, tp]])
     fig_cm = px.imshow(cm, text_auto=True, x=["Pred 0","Pred 1"], y=["True 0","True 1"],
                        color_continuous_scale="Blues", title="Confusion Matrix (th = 0.50)")
-    st.plotly_chart(fig_cm, use_container_width=True, key="cm_base")
+    st.plotly_chart(fig_cm, use_container_width=True, key=f"cm_base_{run_id}")
 
     # ROC
     fpr, tpr, thr = roc_curve(y_test, y_proba)
@@ -187,18 +199,19 @@ if st.button("Train model", type="primary"):
     fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", name=f"ROC (AUC={rocA:.3f})"))
     fig_roc.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines", name="Chance", line=dict(dash="dash")))
     fig_roc.update_layout(title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR (Recall)")
-    st.plotly_chart(fig_roc, use_container_width=True, key="roc_curve")
+    st.plotly_chart(fig_roc, use_container_width=True, key=f"roc_curve_{run_id}")
 
     # Precision–Recall
     prec_curve, rec_curve, thr2 = precision_recall_curve(y_test, y_proba)
     fig_pr = go.Figure()
     fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
-    fig_pr.update_layout(title="Precision–Recall Curve (class = 1)", xaxis_title="Recall", yaxis_title="Precision")
-    st.plotly_chart(fig_pr, use_container_width=True, key="pr_curve")
+    fig_pr.
+update_layout(title="Precision–Recall Curve (class = 1)", xaxis_title="Recall", yaxis_title="Precision")
+    st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
 
     # Threshold tuner (safety-first)
     st.subheader("Threshold tuner (safety-first)")
-    t = st.slider("Decision threshold", 0.05, 0.95, 0.50, 0.01, key="threshold_slider")
+    t = st.slider("Decision threshold", 0.05, 0.95, 0.50, 0.01, key=f"threshold_slider_{run_id}")
     y_pred_t = (y_proba >= t).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred_t).ravel()
     acc_t  = accuracy_score(y_test, y_pred_t)
@@ -210,27 +223,25 @@ if st.button("Train model", type="primary"):
     cm_t = np.array([[tn, fp],[fn, tp]])
     fig_cm_t = px.imshow(cm_t, text_auto=True, x=["Pred 0","Pred 1"], y=["True 0","True 1"],
                          color_continuous_scale="Blues", title=f"Confusion Matrix (th = {t:.2f})")
-    st.plotly_chart(fig_cm_t, use_container_width=True, key="cm_threshold")
+    st.plotly_chart(fig_cm_t, use_container_width=True, key=f"cm_threshold_{run_id}")
 
     # Prediction form
     st.header("🔮 Make a Prediction (single record)")
-    with st.form("predict_form"):
+    with st.form(f"predict_form_{run_id}"):
         inputs = {}
         for c in feature_cols:
             if c in num_cols:
-                minv = float(np.nanmin(df[c])) if pd.api.types.is_numeric_dtype(df[c]) else 0.0
-                maxv = float(np.nanmax(df[c])) if pd.api.types.is_numeric_dtype(df[c]) else 1.0
                 default = float(df[c].median()) if np.isfinite(df[c].median()) else 0.0
-                inputs[c] = st.number_input(f"{c}", value=default)
+                inputs[c] = st.number_input(f"{c}", value=default, key=f"num_{c}_{run_id}")
             else:
                 opts = sorted([str(v) for v in df[c].dropna().unique().tolist()][:50])
-                default = opts[0] if opts else ""
-                inputs[c] = st.selectbox(f"{c}", options=opts, index=0 if opts else None)
+                default_opt = 0 if opts else None
+                inputs[c] = st.selectbox(f"{c}", options=opts, index=default_opt, key=f"cat_{c}_{run_id}")
         submit = st.form_submit_button("Predict tsunami probability")
 
     if submit:
         x_row = pd.DataFrame([inputs])
         p = pipe.predict_proba(x_row)[0,1]
         yhat = int(p >= t)
-        st.success(f"Predicted probability (class=1 tsunami) = **{p:.3f}** → Predicted class @ th={t:.2f}: **{yhat}**")
+        st.success(f"Predicted probability (class=1 tsunami) = {p:.3f} → Predicted class @ th={t:.2f}: **{yhat}**")
         st.caption("Tip: lower the threshold for higher recall (safer), raise it for fewer false alarms.")
