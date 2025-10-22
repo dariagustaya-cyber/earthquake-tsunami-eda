@@ -197,13 +197,16 @@ if st.button("Train model", type="primary", key="train_button"):
     fig_roc.update_layout(title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR (Recall)")
     st.plotly_chart(fig_roc, use_container_width=True, key=f"roc_curve_{run_id}")
 
-    # Precision–Recall
-    prec_curve, rec_curve, thr2 = precision_recall_curve(y_test, y_proba)
-    fig_pr = go.Figure()
-    fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
-    fig_pr.
-update_layout(title="Precision–Recall Curve (class = 1)", xaxis_title="Recall", yaxis_title="Precision")
-    st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
+   # Precision–Recall
+prec_curve, rec_curve, thr2 = precision_recall_curve(y_test, y_proba)
+fig_pr = go.Figure()
+fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
+fig_pr.update_layout(
+    title="Precision–Recall Curve (class = 1)",
+    xaxis_title="Recall",
+    yaxis_title="Precision"
+)
+st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
 
     # Threshold tuner (safety-first)
     st.subheader("Threshold tuner (safety-first)")
