@@ -208,21 +208,31 @@ fig_pr.update_layout(
 )
 st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
 
-    # Threshold tuner (safety-first)
-    st.subheader("Threshold tuner (safety-first)")
-    t = st.slider("Decision threshold", 0.05, 0.95, 0.50, 0.01, key=f"threshold_slider_{run_id}")
-    y_pred_t = (y_proba >= t).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y_test, y_pred_t).ravel()
-    acc_t  = accuracy_score(y_test, y_pred_t)
-    rec_t  = recall_score(y_test, y_pred_t)
-    prec_t = precision_score(y_test, y_pred_t, zero_division=0)
-    f1_t   = f1_score(y_test, y_pred_t)
+   # ---------------------------
+# Threshold tuner (safety-first)
+# ---------------------------
+st.subheader("Threshold tuner (safety-first)")
+t = st.slider("Decision threshold", 0.05, 0.95, 0.50, 0.01, key=f"threshold_slider_{run_id}")
 
-    st.write(f"**Threshold = {t:.2f}** → Accuracy: {acc_t:.3f} | Recall: {rec_t:.3f} | Precision: {prec_t:.3f} | F1: {f1_t:.3f}")
-    cm_t = np.array([[tn, fp],[fn, tp]])
-    fig_cm_t = px.imshow(cm_t, text_auto=True, x=["Pred 0","Pred 1"], y=["True 0","True 1"],
-                         color_continuous_scale="Blues", title=f"Confusion Matrix (th = {t:.2f})")
-    st.plotly_chart(fig_cm_t, use_container_width=True, key=f"cm_threshold_{run_id}")
+y_pred_t = (y_proba >= t).astype(int)
+tn, fp, fn, tp = confusion_matrix(y_test, y_pred_t).ravel()
+acc_t  = accuracy_score(y_test, y_pred_t)
+rec_t  = recall_score(y_test, y_pred_t)
+prec_t = precision_score(y_test, y_pred_t, zero_division=0)
+f1_t   = f1_score(y_test, y_pred_t)
+
+st.write(f"**Threshold = {t:.2f}** → Accuracy: {acc_t:.3f} | Recall: {rec_t:.3f} | Precision: {prec_t:.3f} | F1: {f1_t:.3f}")
+
+cm_t = np.array([[tn, fp], [fn, tp]])
+fig_cm_t = px.imshow(
+    cm_t,
+    text_auto=True,
+    x=["Pred 0", "Pred 1"],
+    y=["True 0", "True 1"],
+    color_continuous_scale="Blues",
+    title=f"Confusion Matrix (th = {t:.2f})"
+)
+st.plotly_chart(fig_cm_t, use_container_width=True, key=f"cm_threshold_{run_id}")
 
     # Prediction form
     st.header("🔮 Make a Prediction (single record)")
