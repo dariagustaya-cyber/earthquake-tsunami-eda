@@ -115,7 +115,7 @@ if {"latitude","longitude"}.issubset(df.columns):
     st.plotly_chart(fig_geo, use_container_width=True, key="geo_map")
 
 # ---------------------------
-# 4) Train/Test split
+# 4) Model Training
 # ---------------------------
 st.header("🧠 Model Training")
 test_size = st.sidebar.slider("Test size", 0.1, 0.4, 0.2, 0.05)
@@ -127,7 +127,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=test_size, random_state=random_state, stratify=y
 )
 
-# Preprocess: scale numeric, one-hot categorical
+# Preprocess
 pre = ColumnTransformer(
     transformers=[
         ("num", StandardScaler(), num_cols),
@@ -136,135 +136,91 @@ pre = ColumnTransformer(
     remainder="drop"
 )
 
-# Model choice
-algo = st.selectbox("Choose model", ["Logistic Regression","Random Forest","Neural Network (MLP)"])
-
+# Choose algorithm
+algo = st.selectbox("Choose model", ["Logistic Regression", "Random Forest", "Neural Network (MLP)"])
 if algo == "Logistic Regression":
-    clf = LogisticRegression(max_iter=200, n_jobs=None)
+    clf = LogisticRegression(max_iter=200)
 elif algo == "Random Forest":
-    clf = RandomForestClassifier(n_estimators=300, max_depth=None, random_state=random_state, n_jobs=-1)
+    clf = RandomForestClassifier(n_estimators=300, random_state=random_state, n_jobs=-1)
 else:
-    clf = MLPClassifier(
-        hidden_layer_sizes=(16,8),
-        activation="relu",
-        solver="adam",
-        max_iter=1000,
-        early_stopping=True,
-        n_iter_no_change=20,
-        random_state=random_state
-    )
+    clf = MLPClassifier(hidden_layer_sizes=(16, 8), activation="relu", max_iter=1000, early_stopping=True)
 
 pipe = Pipeline([("pre", pre), ("clf", clf)])
 
-# -------- Session state setup --------
-if "trained" not in st.session_state:
-    st.session_state.trained = False
-if "run_id" not in st.session_state:
-    st.session_state.run_id = 0
-if "threshold" not in st.session_state:
-    st.session_state.threshold = 0.50  # persistent default
-
-# -------- Train button --------
-if st.button("Train model", type="primary", key="train_button"):
-    st.session_state.run_id += 1
-    run_id = st.session_state.run_id
-
+# Train
+if st.button("Train model", type="primary"):
     pipe.fit(X_train, y_train)
     y_proba = pipe.predict_proba(X_test)[:, 1]
-    # save everything needed for later interactions (no retrain)
-    st.session_state.trained = True
-    st.session_state.pipe = pipe
-    st.session_state.y_proba = y_proba
-    st.session_state.y_test = y_test.values  # ensure np array
-    st.session_state.features = feature_cols
-    st.session_state.num_cols = num_cols
-    st.session_state.cat_cols = cat_cols
+    y_pred = (y_proba >= 0.5).astype(int)
 
-    # Also compute base metrics @0.50 once (for info)
-    y_pred_050 = (y_proba >= 0.50).astype(int)
-    acc  = accuracy_score(y_test, y_pred_050)
-    rec  = recall_score(y_test, y_pred_050)
-    prec = precision_score(y_test, y_pred_050, zero_division=0)
-    f1   = f1_score(y_test, y_pred_050)
+    # Metrics
+    acc = accuracy_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred, zero_division=0)
+    f1 = f1_score(y_test, y_pred)
     rocA = roc_auc_score(y_test, y_proba)
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Accuracy @0.50", f"{acc:.3f}")
-    c2.metric("Recall (1) @0.50", f"{rec:.3f}")
-    c3.metric("Precision (1) @0.50", f"{prec:.3f}")
-    c4.metric("F1 (1) @0.50", f"{f1:.3f}")
+    c1.metric("Accuracy", f"{acc:.3f}")
+    c2.metric("Recall (1)", f"{rec:.3f}")
+    c3.metric("Precision (1)", f"{prec:.3f}")
+    c4.metric("F1 (1)", f"{f1:.3f}")
     c5.metric("ROC–AUC", f"{rocA:.3f}")
 
-    # ROC & PR (do not depend on threshold)
+    # Confusion Matrix
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+    cm = np.array([[tn, fp], [fn, tp]])
+    fig_cm = px.imshow(
+        cm, text_auto=True,
+        x=["Pred 0", "Pred 1"], y=["True 0", "True 1"],
+        color_continuous_scale="Blues",
+        title="Confusion Matrix (threshold = 0.5)"
+    )
+    st.plotly_chart(fig_cm, use_container_width=True, key="cm_final")
+
+    # ROC Curve
     fpr, tpr, _ = roc_curve(y_test, y_proba)
     fig_roc = go.Figure()
     fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", name=f"ROC (AUC={rocA:.3f})"))
     fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Chance", line=dict(dash="dash")))
     fig_roc.update_layout(title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR (Recall)")
-    st.plotly_chart(fig_roc, use_container_width=True, key=f"roc_curve_{run_id}")
+    st.plotly_chart(fig_roc, use_container_width=True, key="roc_curve")
 
+    # PR Curve
     prec_curve, rec_curve, _ = precision_recall_curve(y_test, y_proba)
     fig_pr = go.Figure()
     fig_pr.add_trace(go.Scatter(x=rec_curve, y=prec_curve, mode="lines", name="PR"))
     fig_pr.update_layout(title="Precision–Recall Curve (class = 1)", xaxis_title="Recall", yaxis_title="Precision")
-    st.plotly_chart(fig_pr, use_container_width=True, key=f"pr_curve_{run_id}")
+    st.plotly_chart(fig_pr, use_container_width=True, key="pr_curve")
 
-# -------- Live threshold block (no retrain needed) --------
-if st.session_state.trained:
-    run_id = st.session_state.run_id
-    y_proba = st.session_state.y_proba
-    y_test  = st.session_state.y_test
+    # Save to session for prediction form
+    st.session_state.pipe = pipe
+    st.session_state.trained = True
 
-    st.subheader("Threshold tuner (safety-first)")
-    st.session_state.threshold = st.slider(
-        "Decision threshold", 0.05, 0.95, float(st.session_state.threshold), 0.01,
-key=f"threshold_slider_{run_id}"
-    )
-    t = float(st.session_state.threshold)
-
-    y_pred_t = (y_proba >= t).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y_test, y_pred_t).ravel()
-    acc_t  = accuracy_score(y_test, y_pred_t)
-    rec_t  = recall_score(y_test, y_pred_t)
-    prec_t = precision_score(y_test, y_pred_t, zero_division=0)
-    f1_t   = f1_score(y_test, y_pred_t)
-
-    st.write(
-        f"**Threshold = {t:.2f}** → "
-        f"Accuracy: {acc_t:.3f} | Recall: {rec_t:.3f} | Precision: {prec_t:.3f} | F1: {f1_t:.3f}"
-    )
-
-    cm_t = np.array([[tn, fp], [fn, tp]])
-    fig_cm_t = px.imshow(
-        cm_t, text_auto=True, x=["Pred 0", "Pred 1"], y=["True 0", "True 1"],
-        color_continuous_scale="Blues", title=f"Confusion Matrix (th = {t:.2f})"
-    )
-    st.plotly_chart(fig_cm_t, use_container_width=True, key=f"cm_threshold_{run_id}")
-
-    # ---------------------------
-    # Prediction form (uses saved model)
-    # ---------------------------
+# ---------------------------
+# 5) Prediction form
+# ---------------------------
+if st.session_state.get("trained", False):
     st.header("🔮 Make a Prediction (single record)")
-    with st.form(f"predict_form_{run_id}"):
+    with st.form("predict_form"):
         inputs = {}
-        for c in st.session_state.features:
-            if c in st.session_state.num_cols:
+        for c in feature_cols:
+            if c in num_cols:
                 default = float(df[c].median()) if np.isfinite(df[c].median()) else 0.0
-                inputs[c] = st.number_input(f"{c}", value=default, key=f"num_{c}_{run_id}")
+                inputs[c] = st.number_input(f"{c}", value=default)
             else:
                 opts = sorted([str(v) for v in df[c].dropna().unique().tolist()][:50])
                 default_opt = 0 if opts else None
-                inputs[c] = st.selectbox(f"{c}", options=opts, index=default_opt, key=f"cat_{c}_{run_id}")
+                inputs[c] = st.selectbox(f"{c}", options=opts, index=default_opt)
         submit = st.form_submit_button("Predict tsunami probability")
 
     if submit:
         x_row = pd.DataFrame([inputs])
         p = st.session_state.pipe.predict_proba(x_row)[0, 1]
-        yhat = int(p >= t)
+        yhat = int(p >= 0.5)
         st.success(
-            f"Predicted probability (class=1 tsunami) = {p:.3f} "
-            f"→ Predicted class @ th={t:.2f}: **{yhat}**"
+f"Predicted probability (class=1 tsunami) = {p:.3f} "
+            f"→ Predicted class (threshold 0.5): **{yhat}**"
         )
-        st.caption("Tip: lower the threshold for higher recall (safer), raise it for fewer false alarms.")
 else:
-    st.info("Train a model first to enable the threshold tuner and prediction form.")
+    st.info("Train a model first to enable the prediction form.")
